@@ -1,4 +1,4 @@
-datasetpath: "path"
+datasetpath: "/home/roman/projects/ai/NYU_HAND_POSE_DATASET/dataset"
 model_name: hglass_2_1
 dataset: nyu
 cubic_size: 280
@@ -12,13 +12,15 @@ comjitter: 1
 RandDotPercentage: 0.15 #PixDropOut
 scale_aug: 1
 
-use_fp16: 1
+use_fp16: 0
 
 save_freq: 10
 
-paralelization_type: N
+paralelization_type: DDP
 device_IDs: 0,1,2,3
 default_cuda_id: '0'
+ngpus_per_node: "4"
+rank: 0
 
 LossFunction: L1
 train_mode: normal
