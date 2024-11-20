@@ -9,6 +9,7 @@ import tqdm
 import sys
 import os
 import time
+import datetime
 import argparse
 from utils.forwardpass import get_EvalFunction
 
@@ -318,9 +319,12 @@ if __name__ == "__main__":
         + "\n"
         + f"Best Model = {best_name} => 3D error = {best_3Derr:.3f}\n\n--"
     )
-    f = open("results.txt", "a+")
-    f.write(output_message)
-    f.close()
+
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"results_{timestamp}.txt"
+    with open(filename, "w") as f:
+        f.write(output_message)
+
     print(best_name)
 
     if args.save_preds != "none":
