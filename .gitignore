@@ -82,9 +82,6 @@ dmypy.json
 *.sublime-project
 *.sublime-workspace
 
-# # Data files
- data/
-
 # Logs and databases
 logs/
 *.log
