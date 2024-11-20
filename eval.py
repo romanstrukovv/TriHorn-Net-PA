@@ -44,7 +44,16 @@ def evaluate(
     for i, data in enumerate(loop):
         loop.set_description(model_name)
 
-        inputs, gt2Dcrop, gt2Dorignal, gt3Dorignal, com, M_inv, cubesize = (
+        (
+            inputs,
+            gt2Dcrop,
+            gt2Dorignal,
+            gt3Dorignal,
+            com,
+            M_inv,
+            cubesize,
+            partial_annotations,
+        ) = (
             data[0].to(device),
             data[1].to(device),
             data[2].to(device),
@@ -52,9 +61,10 @@ def evaluate(
             data[4].to(device),
             data[5].to(device),
             data[6].to(device),
+            data[10].to(device),
         )
 
-        outputs = model(inputs)
+        outputs = model(inputs, partial_annotations=partial_annotations)
 
         preds = OutputToPred(
             inputs, outputs, cubesize, com, setting
@@ -228,6 +238,7 @@ if __name__ == "__main__":
             train=False,
             basepath=os.environ.get("NYU_PATH", args.datasetpath),
             center_refined=args.center_refined,
+            partial_annotation_fraction=0.0,
         )
 
     elif args.dataset == "icvl":

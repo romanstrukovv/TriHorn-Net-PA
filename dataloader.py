@@ -1,4 +1,5 @@
 import math
+import random
 import cv2
 import torch
 from torch.utils.data.dataset import Dataset
@@ -37,7 +38,7 @@ class HandPoseDataset(Dataset):
         rotationAngleRange=[-45.0, 45.0],
         comJitter=False,
         RandDotPercentage=0,
-        indeces=None,
+        indices=None,
         sigmaNoise=2,
         cropSize3D=[250, 250, 250],
         do_norm_zero_one=False,
@@ -82,12 +83,12 @@ class HandPoseDataset(Dataset):
         else:
             self.seqName = "test"
 
-        if indeces is None:
+        if indices is None:
             self.numSamples = self.numSamples
-            self.indeces = [i for i in range(self.numSamples)]
+            self.indices = [i for i in range(self.numSamples)]
         else:
-            self.indeces = indeces
-            self.numSamples = len(indeces)
+            self.indices = indices
+            self.numSamples = len(indices)
 
         if drop_joint_num > 0:
             print(
@@ -165,16 +166,23 @@ class HandPoseDataset(Dataset):
             / np.array([1, 1.0, data["cubesize"][2] / 2.0])
         )
 
+        gt2Dcrop_pa = torch.from_numpy(
+            (data["gt2Dcrop_pa"] - np.array([0, 0, com[2]]))
+            / np.array([1, 1.0, data["cubesize"][2] / 2.0])
+        )
+
         if (
             self.horizontal_flip and np.random.rand() < 0.5
         ):  # remember in this case, M will not result in the original UVD
             img, gt2Dcrop = horizontal_flip_depth(img, gt2Dcrop)
+            _, gt2Dcrop_pa = horizontal_flip_depth(img, gt2Dcrop_pa)
 
         if (
             self.scale_aug and np.random.rand() < 0.7
         ):  # remember in this case, M will not result in the original UVD
             scale = 0.8 + np.random.random() * 0.4
             img, gt2Dcrop = scale_depth(img, gt2Dcrop, scale)
+            _, gt2Dcrop_pa = scale_depth(img, gt2Dcrop_pa, scale)
             self.randomScale = scale
         else:
             self.randomScale = 1
@@ -235,6 +243,7 @@ class HandPoseDataset(Dataset):
             joint_mask.float(),
             visible_mask,
             M,
+            gt2Dcrop_pa.float(),
         )
 
     def cropArea3D(
@@ -371,7 +380,7 @@ class NYUHandPoseDataset(HandPoseDataset):
         rotationAngleRange=[-45.0, 45.0],
         comJitter=False,
         RandDotPercentage=0,
-        indeces=None,
+        indices=None,
         sigmaNoise=1,
         cropSize3D=[250, 250, 250],
         camID=1,
@@ -382,6 +391,7 @@ class NYUHandPoseDataset(HandPoseDataset):
         center_refined=False,
         horizontal_flip=0,
         scale_aug=0,
+        partial_annotation_fraction=0.0,
     ):
 
         self.fx, self.fy, self.ux, self.uy = (588.036865, 587.075073, 320, 240)
@@ -389,6 +399,7 @@ class NYUHandPoseDataset(HandPoseDataset):
         self.doLoadRealSample = doLoadRealSample
 
         self.num_joints = len(nyuRestrictedJointsEval)
+        self.partial_annotation_fraction = partial_annotation_fraction
 
         if train:
             self.seqName = "train"
@@ -400,7 +411,10 @@ class NYUHandPoseDataset(HandPoseDataset):
         self.labelMat = scipy.io.loadmat(labels)
 
         # Get number of samples from annotations (test: 8252; train: 72757)
-        self.numSamples = self.labelMat["joint_xyz"][camID - 1].shape[0]
+        # self.numSamples = self.labelMat["joint_xyz"][camID - 1].shape[0]
+        self.numSamples = (
+            1000 if train else 500
+        )  # DEBUG (number of samples for training and evaluation)
 
         super(NYUHandPoseDataset, self).__init__(
             basepath=basepath,
@@ -411,7 +425,7 @@ class NYUHandPoseDataset(HandPoseDataset):
             rotationAngleRange=rotationAngleRange,
             comJitter=comJitter,
             RandDotPercentage=RandDotPercentage,
-            indeces=indeces,
+            indices=indices,
             sigmaNoise=sigmaNoise,
             cropSize3D=cropSize3D,
             do_norm_zero_one=do_norm_zero_one,
@@ -526,11 +540,25 @@ class NYUHandPoseDataset(HandPoseDataset):
         com3D = self.pointImgTo3D(com)
         gt3Dcrop = gt3Dorignal - com3D  # normalize to com
         gt2Dcrop = np.zeros((gt2Dorignal.shape[0], 3), np.float32)
+        gt2Dcrop_pa = np.zeros((gt2Dorignal.shape[0], 3), np.float32)
         for joint in range(gt2Dorignal.shape[0]):
             t = transformPoint2D(gt2Dorignal[joint], M)
             gt2Dcrop[joint, 0] = t[0]
             gt2Dcrop[joint, 1] = t[1]
             gt2Dcrop[joint, 2] = gt2Dorignal[joint, 2]
+
+        if self.partial_annotation_fraction > 0:
+            num_joints_to_remove = int(
+                self.num_joints * self.partial_annotation_fraction
+            )
+            joints_to_remove = random.sample(
+                range(self.num_joints), num_joints_to_remove
+            )
+            # Set the joints that are to be removed as invalid
+            gt2Dcrop_pa = gt2Dcrop
+            gt2Dcrop_pa[joints_to_remove, :] = (
+                -1
+            )  # Mark removed joints with -1 or another flag value
 
         D = {}
         D["M"] = M
@@ -539,13 +567,14 @@ class NYUHandPoseDataset(HandPoseDataset):
         D["dpt"] = dpt.astype(np.float32)
         D["gt2Dorignal"] = gt2Dorignal
         D["gt2Dcrop"] = gt2Dcrop
+        D["gt2Dcrop_pa"] = gt2Dcrop_pa
         D["gt3Dorignal"] = gt3Dorignal
         D["gt3Dcrop"] = gt3Dcrop
         return D
 
     def get_validIndex(self, ind):
 
-        return self.indeces[ind]
+        return self.indices[ind]
 
     def convert_uvd_to_xyz_tensor(self, uvd):
         # uvd is a tensor of  size(B,num_joints,3)
@@ -610,7 +639,7 @@ class ICVLHandPoseDataset(HandPoseDataset):
         rotationAngleRange=[-45.0, 45.0],
         comJitter=False,
         RandDotPercentage=0,
-        indeces=None,
+        indices=None,
         sigmaNoise=1,
         cropSize3D=[250, 250, 250],
         do_norm_zero_one=False,
@@ -652,7 +681,7 @@ class ICVLHandPoseDataset(HandPoseDataset):
             rotationAngleRange=rotationAngleRange,
             comJitter=comJitter,
             RandDotPercentage=RandDotPercentage,
-            indeces=indeces,
+            indices=indices,
             sigmaNoise=sigmaNoise,
             cropSize3D=cropSize3D,
             do_norm_zero_one=do_norm_zero_one,
@@ -671,9 +700,9 @@ class ICVLHandPoseDataset(HandPoseDataset):
 
     def get_validIndex(self, ind):
 
-        valIndex = self.indeces[ind]
+        valIndex = self.indices[ind]
         while valIndex in InvalidIndicies:
-            valIndex = self.indeces[np.random.randint(0, self.numSamples)]
+            valIndex = self.indices[np.random.randint(0, self.numSamples)]
 
         return valIndex
 
@@ -793,7 +822,7 @@ class MSRAHandPoseDataset(HandPoseDataset):
         rotationAngleRange=[-45.0, 45.0],
         comJitter=False,
         RandDotPercentage=0,
-        indeces=None,
+        indices=None,
         sigmaNoise=1,
         cropSize3D=[250, 250, 250],
         do_norm_zero_one=False,
@@ -880,7 +909,7 @@ class MSRAHandPoseDataset(HandPoseDataset):
             rotationAngleRange=rotationAngleRange,
             comJitter=comJitter,
             RandDotPercentage=RandDotPercentage,
-            indeces=indeces,
+            indices=indices,
             sigmaNoise=sigmaNoise,
             cropSize3D=cropSize3D,
             do_norm_zero_one=do_norm_zero_one,
@@ -901,7 +930,7 @@ class MSRAHandPoseDataset(HandPoseDataset):
 
     def get_validIndex(self, ind):
 
-        return self.indeces[ind]
+        return self.indices[ind]
 
     def LoadSample(self, ind, com=None):
         idComGT = 9

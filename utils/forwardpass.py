@@ -37,6 +37,7 @@ def get_EvalFunction(args):
 def Normal_forwardPass(
     model,
     inputs,
+    partial_annotations,
     gt_uvd,
     lossFunction,
     cubesize,
@@ -47,7 +48,7 @@ def Normal_forwardPass(
     suffix=None,
 ):
     mask = joint_mask * visible_mask
-    output = model(inputs)
+    output = model(inputs, partial_annotations=partial_annotations)
     output = Normalize_depth(
         output, sizes=cubesize, coms=coms, add_com=False
     )  # # torch.mean(abs(output-gt_uvd)*mask[...,None])

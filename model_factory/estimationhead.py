@@ -181,7 +181,9 @@ class EstimationHead(nn.Module):
         conv = nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=True)
         return nn.Sequential(conv, bn, self.relu)
 
-    def forward(self, x, return_heatmap=False, scale_factor=2):
+    def forward(
+        self, x, partial_annotations=None, return_heatmap=False, scale_factor=2
+    ):
         num_batch = x.shape[0]
         uv_out = self.UVbranch(x)
         hmp = self.soft(uv_out)  # B, num_class, H,H
@@ -207,6 +209,11 @@ class EstimationHead(nn.Module):
         )  # B,J,1
 
         UVD = torch.cat([UV0 * scale_factor, D0], dim=-1)
+
+        if partial_annotations is not None:
+            mask = partial_annotations.isnan().logical_not()
+            predicted = UVD * mask + partial_annotations * mask
+            UVD = predicted
 
         if return_heatmap:
             return UVD, (uv_out, aux_attention, attentionmap)

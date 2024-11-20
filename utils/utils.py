@@ -62,7 +62,7 @@ def get_scheduler(optimizer, args):
         )
     elif scheduler_type == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-            optimizer, T_0=args.num_epoch, T_mult=args.Tmult, eta_min=args.eta_min
+            optimizer, T_0=args.num_epoch, T_mult=int(args.Tmult), eta_min=args.eta_min
         )
     elif scheduler_type == "auto":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -127,7 +127,7 @@ def DATA_Getters(args):
         rotationAngleRange=[-45.0, 45.0],
         comJitter=args.comjitter,
         RandDotPercentage=args.RandDotPercentage,
-        indeces=labeled_subset,
+        indices=labeled_subset,
         cropSize3D=cubic_size,
         do_norm_zero_one=False,
         random_seed=args.randseed,
@@ -135,6 +135,7 @@ def DATA_Getters(args):
         center_refined=args.center_refined,
         horizontal_flip=args.horizontal_flip,
         scale_aug=args.scale_aug,
+        partial_annotation_fraction=0.3,
     )
 
     if args.dataset == "nyu":

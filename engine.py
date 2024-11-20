@@ -40,22 +40,40 @@ def Train(
         for i, data in enumerate(loop, 0):
 
             if args.paralelization_type == "DDP":
-                inputs, gt_uvd, com, cubesize, joint_mask, visible_mask = (
+                (
+                    inputs,
+                    gt_uvd,
+                    com,
+                    cubesize,
+                    joint_mask,
+                    visible_mask,
+                    partial_annotations,
+                ) = (
                     data[0].cuda(device, non_blocking=True),
                     data[1].cuda(device, non_blocking=True),
                     data[4].cuda(device, non_blocking=True),
                     data[6].cuda(device, non_blocking=True),
                     data[7].cuda(device, non_blocking=True),
                     data[8].cuda(device, non_blocking=True),
+                    data[10].cuda(device, non_blocking=True),
                 )
             else:
-                inputs, gt_uvd, com, cubesize, joint_mask, visible_mask = (
+                (
+                    inputs,
+                    gt_uvd,
+                    com,
+                    cubesize,
+                    joint_mask,
+                    visible_mask,
+                    partial_annotations,
+                ) = (
                     data[0].to(device),
                     data[1].to(device),
                     data[4].to(device),
                     data[6].to(device),
                     data[7].to(device),
                     data[8].to(device),
+                    data[10].cuda(device),
                 )
 
             scale = args.cubic_size / 2.0
@@ -70,6 +88,7 @@ def Train(
                 loss, loss_dict = ForwardPassFunc(
                     model,
                     inputs,
+                    partial_annotations,
                     gt_uvd,
                     lossFunction,
                     cubesize,

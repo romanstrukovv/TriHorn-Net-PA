@@ -208,7 +208,7 @@ class HourglassNet(nn.Module):
             self.relu,
         )
 
-    def forward(self, x, return_heatmap=False):
+    def forward(self, x, partial_annotations=None, return_heatmap=False):
         out = []
         outD = []
         self.Xs = self.Xs.to(x.device)
@@ -226,10 +226,12 @@ class HourglassNet(nn.Module):
         y = self.hg(x)
 
         if return_heatmap:
-            UVD, hmp = self.estimator(y, return_heatmap=True)
+            UVD, hmp = self.estimator(
+                y, partial_annotations=partial_annotations, return_heatmap=True
+            )
             return UVD, hmp
 
-        UVD = self.estimator(y)
+        UVD = self.estimator(y, partial_annotations=partial_annotations)
         return UVD
 
 
