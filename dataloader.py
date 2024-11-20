@@ -411,10 +411,10 @@ class NYUHandPoseDataset(HandPoseDataset):
         self.labelMat = scipy.io.loadmat(labels)
 
         # Get number of samples from annotations (test: 8252; train: 72757)
-        # self.numSamples = self.labelMat["joint_xyz"][camID - 1].shape[0]
-        self.numSamples = (
-            1000 if train else 500
-        )  # DEBUG (number of samples for training and evaluation)
+        self.numSamples = self.labelMat["joint_xyz"][camID - 1].shape[0]
+        # self.numSamples = (
+        #     1000 if train else 500
+        # )  # DEBUG (number of samples for training and evaluation)
 
         super(NYUHandPoseDataset, self).__init__(
             basepath=basepath,
