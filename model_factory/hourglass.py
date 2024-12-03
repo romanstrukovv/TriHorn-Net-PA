@@ -152,8 +152,14 @@ class HourglassNet(nn.Module):
         self.num_feats = 128
         self.num_stacks = num_stacks
         self.conv1 = nn.Conv2d(
-            1, self.inplanes, kernel_size=7, stride=1, padding=3, bias=True
+            1 + num_classes,
+            self.inplanes,
+            kernel_size=7,
+            stride=1,
+            padding=3,
+            bias=True,
         )
+
         self.bn1 = (
             nn.BatchNorm2d(self.inplanes) if BN else nn.GroupNorm(num_G, self.inplanes)
         )
@@ -177,6 +183,49 @@ class HourglassNet(nn.Module):
             BN=BN,
             num_G=num_G,
         )
+
+    def create_partial_annotations_mask(
+        self, partial_annotations, image_height, image_width
+    ):
+        """
+        Create a binary mask for partial annotations.
+
+        Args:
+            partial_annotations (torch.Tensor): Tensor of shape (batch_size, num_classes, extra_dim)
+                                                where extra_dim needs reduction.
+            image_height (int): The height of the output mask.
+            image_width (int): The width of the output mask.
+
+        Returns:
+            torch.Tensor: Mask of shape (batch_size, num_classes, H, W).
+        """
+        # Debugging shape
+        # print(f"Shape of partial_annotations: {partial_annotations.shape}")
+
+        if partial_annotations.dim() == 3 and partial_annotations.shape[-1] == 3:
+            # Select or reduce the extra dimension
+            partial_annotations = partial_annotations[
+                ..., 0
+            ]  # Example: Use the first channel
+            # Or use this if it's confidence-based
+            # partial_annotations = (partial_annotations.max(dim=-1).values > 0).float()
+
+        elif partial_annotations.dim() > 2:
+            # Handle any unexpected higher dimensions
+            partial_annotations = partial_annotations.squeeze(-1)  # Adjust as needed
+
+        # Ensure correct shape
+        batch_size, num_classes = partial_annotations.shape
+
+        # Reshape and interpolate to match the image dimensions
+        mask = partial_annotations.view(
+            batch_size, num_classes, 1, 1
+        )  # Shape: (B, C, 1, 1)
+        mask = F.interpolate(
+            mask.float(), size=(image_height, image_width), mode="nearest"
+        )  # Shape: (B, C, H, W)
+
+        return mask
 
     def _make_residual(self, block, planes, blocks, BN, num_G, stride=1):
         downsample = None
@@ -213,6 +262,13 @@ class HourglassNet(nn.Module):
         outD = []
         self.Xs = self.Xs.to(x.device)
         self.Ys = self.Ys.to(x.device)
+
+        if partial_annotations is not None:
+            batch_size, _, height, width = x.shape
+            mask = self.create_partial_annotations_mask(
+                partial_annotations, height, width
+            )  # Shape: (B, num_classes, H, W)
+            x = torch.cat([x, mask], dim=1)
 
         x = self.conv1(x)
         x = self.bn1(x)

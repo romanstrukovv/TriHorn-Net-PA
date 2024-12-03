@@ -210,10 +210,10 @@ class EstimationHead(nn.Module):
 
         UVD = torch.cat([UV0 * scale_factor, D0], dim=-1)
 
-        if partial_annotations is not None:
-            mask = partial_annotations.isnan().logical_not()
-            predicted = UVD * mask + partial_annotations * mask
-            UVD = predicted
+        # if partial_annotations is not None:
+        #     mask = partial_annotations.isnan().logical_not()
+        #     predicted = UVD * mask + partial_annotations * mask
+        #     UVD = predicted
 
         if return_heatmap:
             return UVD, (uv_out, aux_attention, attentionmap)
