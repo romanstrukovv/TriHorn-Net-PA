@@ -547,9 +547,16 @@ class NYUHandPoseDataset(HandPoseDataset):
             gt2Dcrop[joint, 1] = t[1]
             gt2Dcrop[joint, 2] = gt2Dorignal[joint, 2]
 
+        # print(
+        #     f"gt2Dcrop[0, 0]: {gt2Dcrop[0, 0]}\n gt2Dcrop[0, 1]: {gt2Dcrop[0, 1]}\n gt2Dcrop[0, 2]: {gt2Dcrop[0, 2]}\n"
+        # )
+        # gt2Dcrop_pa[0, 0] = gt2Dcrop[0, 0]
+        # gt2Dcrop_pa[0, 1] = gt2Dcrop[0, 1]
+        # gt2Dcrop_pa[0, 2] = gt2Dcrop[0, 2]
+        print(f"gt2Dcrop.shape = {gt2Dcrop.shape}\n")
         if self.partial_annotation_fraction > 0:
             num_joints_to_remove = int(
-                self.num_joints * self.partial_annotation_fraction
+                self.num_joints * (1 - self.partial_annotation_fraction)
             )
             joints_to_remove = random.sample(
                 range(self.num_joints), num_joints_to_remove
